@@ -403,9 +403,8 @@ const PALETTE = {
   h: '#454545', // 髪のツヤ（パーマのうねり）
   S: '#eec4a0', // 肌
   s: '#d9a682', // 肌の影
-  E: '#2a1a12', // 目（笑って細くなってる）
+  E: '#2a1a12', // 目（細め）
   M: '#8a3b2e', // 口
-  T: '#ffffff', // 歯
   K: '#262626', // 黒パーカー
   k: '#141414', // パーカーの影（腕・ポケット・裾のリブ）
   F: '#3d3d3d', // フード（髪や服と区別できるよう少し明るく）
@@ -428,8 +427,8 @@ const BODY = [
   '.HHHHHSSSSSSSSSS',
   'HHHHHsSSSEESSEES',
   '.HHHSsSSSSSSSSSS',
-  'HHHHSSSSSMTTTMS',
-  '.FHHHsSSSSMMMS',
+  'HHHHSSSSSSMMMSS',
+  '.FHHHsSSSSSSSS',
   'FKKKfsSSSSSSS',
   'FKKKKfsSSSS',
   'FKKKKKfKKKKKK',
