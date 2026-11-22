@@ -164,8 +164,8 @@
       show();
       if (!storage.get('fuji-kick-name')) {
         pending = result;
-        status.textContent = '名前を入れるとランキングに載ります';
         openNameForm();
+        load(); // 名前を入れる前から今のランキングを見せる
       } else {
         submit(result);
       }
