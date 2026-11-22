@@ -8,7 +8,8 @@ const FPS = 60;
 const dino = (v) => v * SCALE * FPS;          // 本家の 速度(px/フレーム) → px/秒
 const dinoAcc = (v) => v * SCALE * FPS * FPS; // 本家の 加速度(px/フレーム^2) → px/秒^2
 
-const W = 600 * SCALE;      // 960
+const MAX_W = 600 * SCALE;  // 960。ステージの最大幅
+let W = MAX_W;              // ステージの幅。画面が狭いと本家と同じく狭くなる（resize で決まる）
 const H = 150 * SCALE;      // 240
 const GROUND_Y = H - 10 * SCALE; // 本家の bottomPad 10
 
@@ -62,11 +63,25 @@ const COLOR = {
 const canvas = document.getElementById('game');
 const ctx = canvas.getContext('2d');
 
+// 本家はスマホでは拡大縮小せず実寸（恐竜47px）で表示し、ステージの幅を画面幅に合わせて狭める。
+// ここでも、藤くんが本家の恐竜より小さくならない倍率（1/SCALE）を下限にして、足りない分はステージを狭める。
+const MIN_DISPLAY_SCALE = 1 / SCALE;
+let displayScale = 1;
 function resize() {
+  const cssW = Math.min(window.innerWidth, MAX_W);
+  displayScale = Math.max(MIN_DISPLAY_SCALE, cssW / MAX_W);
+  W = Math.round(cssW / displayScale);
   const dpr = Math.min(window.devicePixelRatio || 1, 3);
-  canvas.width = W * dpr;
-  canvas.height = H * dpr;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  canvas.style.width = `${cssW}px`;
+  canvas.style.height = `${H * displayScale}px`;
+  canvas.width = Math.round(W * displayScale * dpr);
+  canvas.height = Math.round(H * displayScale * dpr);
+  ctx.setTransform(displayScale * dpr, 0, 0, displayScale * dpr, 0, 0);
+}
+
+// 本家と同じく、ステージが狭いときは初速を落とす（mobileSpeedCoefficient 1.2）
+function startSpeed() {
+  return W < MAX_W ? Math.min(START_SPEED, START_SPEED * (W / MAX_W) * 1.2) : START_SPEED;
 }
 resize();
 window.addEventListener('resize', resize);
@@ -113,7 +128,7 @@ function reset() {
   player.vy = 0;
   player.jumping = false;
   player.kickTimer = 0;
-  speed = START_SPEED;
+  speed = startSpeed();
   distance = 0;
   kicks = 0;
   score = 0;
@@ -283,7 +298,8 @@ window.addEventListener('keydown', (e) => {
 window.addEventListener('keyup', (e) => {
   if (isActionKey(e)) release();
 });
-canvas.addEventListener('pointerdown', (e) => {
+// 本家と同じく画面のどこをタップしても反応する
+window.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   press();
 });
@@ -487,15 +503,33 @@ const LEGS = {
 const HEM_OVERLAP = 0; // 裾が脚に重なる行数
 const SPRITE_ROWS = BODY.length - HEM_OVERLAP + 12; // 足元までの行数（走り・キック基準）
 
+// ドット絵は 1ドット=1px の画像にしてから拡大して描く。
+// 1ドットずつ fillRect すると、半端な倍率のときにドットの間に隙間（網目）が出るため。
+const pixelImages = new Map();
+function pixelImage(rows) {
+  let img = pixelImages.get(rows);
+  if (!img) {
+    img = document.createElement('canvas');
+    img.width = Math.max(...rows.map((r) => r.length));
+    img.height = rows.length;
+    const c = img.getContext('2d');
+    rows.forEach((row, r) => {
+      for (let i = 0; i < row.length; i++) {
+        const color = PALETTE[row[i]];
+        if (!color) continue;
+        c.fillStyle = color;
+        c.fillRect(i, r, 1, 1);
+      }
+    });
+    pixelImages.set(rows, img);
+  }
+  return img;
+}
+
 function drawPixels(c, rows, x, y) {
-  rows.forEach((row, r) => {
-    for (let i = 0; i < row.length; i++) {
-      const color = PALETTE[row[i]];
-      if (!color) continue;
-      c.fillStyle = color;
-      c.fillRect(x + i * PIXEL, y + r * PIXEL, PIXEL, PIXEL);
-    }
-  });
+  const img = pixelImage(rows);
+  c.imageSmoothingEnabled = false;
+  c.drawImage(img, x, y, img.width * PIXEL, img.height * PIXEL);
 }
 
 function drawFuji(c, x, baseY, pose, bob = 0) {
