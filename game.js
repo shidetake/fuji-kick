@@ -508,7 +508,7 @@ const LEGS = {
     '....WWWWWWW',
     '....OOOOOOO',
   ],
-  jump: [
+  jump: [ // ガニ股で、左右の足の高さは揃える
     '...PPPPPPPPP',
     '...PPPPPPPPP',
     '..PPPPPPPPPPP',
@@ -516,10 +516,8 @@ const LEGS = {
     'PPPPP....PPPPP',
     'PPPP......PPPP',
     'PPPP......PPPP',
-    'WWWW......PPPP',
-    'OOOO......PPPP',
-    '..........WWWWW',
-    '..........OOOOO',
+    'WWWW......WWWWW',
+    'OOOO......OOOOO',
   ],
   kick: [
     '...PPPPPPPPP',
@@ -577,13 +575,31 @@ const MIO_BODY = [
   '..ggggggggggg',
 ];
 
+// みおちゃんのジャンプは両脚を揃えて膝を曲げる（走りは藤くんと共通）
+const MIO_LEGS = {
+  ...LEGS,
+  jump: [
+    '...PPPPPPPPP',
+    '...PPPPPPPPP',
+    '...PPPPPPPPPP',
+    '....PPPPPPPPPP',
+    '.....PPPPPPPPP',
+    '.....PPPPPPPP',
+    '....PPPPPPPP',
+    '...PPPPPPPP',
+    '...PPPPPPP',
+    '..WWWWWWWWW',
+    '..OOOOOOOOO',
+  ],
+};
+
 const HEM_OVERLAP = 0; // 裾が脚に重なる行数
 const SPRITE_ROWS = BODY.length - HEM_OVERLAP + 12; // 足元までの行数（走り・キック基準）
 
 // 選べるキャラ。canKick: ビールを蹴れるか（false ならビールもジャンプで避ける）
 const CHARACTERS = {
   fuji: { name: '藤くん', canKick: true, rule: 'ビールは蹴る / コーラは跳ぶ', body: BODY, legs: LEGS, palette: PALETTE },
-  mio: { name: 'みおちゃん', canKick: false, rule: 'ビールもコーラも跳んで避ける', body: MIO_BODY, legs: LEGS, palette: MIO_PALETTE },
+  mio: { name: 'みおちゃん', canKick: false, rule: 'ビールもコーラも跳んで避ける', body: MIO_BODY, legs: MIO_LEGS, palette: MIO_PALETTE },
 };
 const currentCharacter = () => CHARACTERS[characterId];
 
