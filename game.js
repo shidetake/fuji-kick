@@ -791,8 +791,6 @@ function draw() {
   if (state === 'title') {
     drawCenter([
       ['FUJI-KICK', 40, true],
-      ['藤くんとみおちゃんが交代で走るよ', 16, false],
-      [`次は${ch.name}：${ch.rule}`, 16, true],
       ['タップ or スペースでスタート', 16, false],
     ]);
     ctx.textAlign = 'left';

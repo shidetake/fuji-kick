@@ -158,8 +158,6 @@
       character = result.character || 'fuji';
       el('ranking-title').textContent = `ランキング TOP10（${CHARACTERS[character].name}）`;
       el('result-message').textContent = overMessage;
-      const next = CHARACTERS[otherCharacter(character)];
-      el('next-char').textContent = `次は ${next.name}（${next.rule}）`;
       el('result-score').textContent = `SCORE ${String(result.score).padStart(5, '0')}` +
         (CHARACTERS[character].canKick ? `  🍺 × ${result.kicks}` : '');
       list.innerHTML = '';
