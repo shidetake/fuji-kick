@@ -408,6 +408,7 @@ const BODY = [
   '...KKkKKKKKK',
   '...KKkKKKKKK',
   '...KKkKKKKKK',
+  '...KKkKKKKKK',
   '...KKSSKKKKK',
   '...KKKKKKKKK',
 ];
@@ -416,9 +417,12 @@ const LEGS = {
   run1: [
     '...PPPPPPPPP',
     '...PPPPPPPPP',
+    '...PPPPPPPPP',
     '..PPPP.PPPPP',
-    '..PPP...PPPP',
+    '..PPPP..PPPP',
+    '..PPP....PPPP',
     '.PPPP....PPPP',
+    '.PPP......PPPP',
     '.PPP......PPPP',
     'PPPP.......PPPP',
     'WWWW.......WWWWW',
@@ -427,8 +431,11 @@ const LEGS = {
   run2: [
     '...PPPPPPPPP',
     '...PPPPPPPPP',
+    '...PPPPPPPPP',
     '...PPPPPPPP',
     '....PPPPPPP',
+    '....PPPPPP',
+    '....PPPPPP',
     '....PPPPPP',
     '....PPPPPP',
     '....PPPPPP',
@@ -437,18 +444,24 @@ const LEGS = {
   ],
   jump: [
     '...PPPPPPPPP',
+    '...PPPPPPPPP',
     '..PPPPPPPPPPP',
     '.PPPPPPPPPPPPP',
-    'PPPP.....PPPPP',
+    'PPPPP....PPPPP',
+    'PPPP......PPPP',
     'PPPP......PPPP',
     'WWWW......PPPP',
-    'OOOO......WWWWW',
+    'OOOO......PPPP',
+    '..........WWWWW',
     '..........OOOOO',
   ],
   kick: [
-    '...PPPPPPPPPPPPPPPWWW',
-    '...PPPPPPPPPPPPPPPWWWO',
-    '...PPPPP.........WWWWO',
+    '...PPPPPPPPP',
+    '...PPPPPPPPPPPPPPPPPWWW',
+    '...PPPPPPPPPPPPPPPPPWWWO',
+    '...PPPPP...........WWWWO',
+    '...PPPP',
+    '...PPPP',
     '...PPPP',
     '...PPPP',
     '...PPPP',
@@ -458,7 +471,7 @@ const LEGS = {
   ],
 };
 
-const SPRITE_ROWS = BODY.length + 9; // 足元までの行数（走り・キック基準）
+const SPRITE_ROWS = BODY.length + 12; // 足元までの行数（走り・キック基準）
 
 function drawPixels(c, rows, x, y) {
   rows.forEach((row, r) => {
