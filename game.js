@@ -377,8 +377,9 @@ const PALETTE = {
   E: '#2a1a12', // 目（笑って細くなってる）
   M: '#8a3b2e', // 口
   T: '#ffffff', // 歯
-  K: '#262626', // 黒トップス
-  k: '#121212', // 影（腕のライン）
+  K: '#262626', // 黒パーカー
+  k: '#141414', // パーカーの影（腕・ポケット・裾のリブ）
+  D: '#cfcfcf', // パーカーの紐
   P: '#363a42', // ワイドパンツ
   W: '#c9c4bb', // スニーカー
   O: '#8c867c', // ソール
@@ -399,18 +400,20 @@ const BODY = [
   '.HHHSsSSSSSSSSSS',
   '.HHHSSSSSMTTTMS',
   '..HHHsSSSSMMMS',
-  '....sSSSSSSS',
-  '.....sSSSS',
-  '....KKKKKKK',
-  '...KKKKKKKKK',
-  '...KKkKKKKKK',
-  '...KKkKKKKKK',
-  '...KKkKKKKKK',
-  '...KKkKKKKKK',
-  '...KKkKKKKKK',
-  '...KKkKKKKKK',
-  '...KKSSKKKKK',
-  '...KKKKKKKKK',
+  '..kKKsSSSSSSS',
+  '.kKKKKsSSSS',
+  '.kKKKKKKDKDKKK',
+  '.KKKKKKKDKDKKKK',
+  '.KKKKkKKDKDKKKK',
+  '.KKKKkKKKKKKKKK',
+  '.KKKKkKKKKKKKKK',
+  '.KKKKkKKKKKKKKK',
+  '.KKKKkKKkkkkkKK',
+  '.KKKKkKKKKKKKKK',
+  '.KKKkkkKKKKKKKK',
+  '.KKKSSKKKKKKKKK',
+  '.KKKKKKKKKKKKKK',
+  '.kkkkkkkkkkkkkk',
 ];
 
 const LEGS = {
@@ -457,11 +460,11 @@ const LEGS = {
   ],
   kick: [
     '...PPPPPPPPP',
-    '...PPPPPPPPPPPPPPPPPWWW',
-    '...PPPPPPPPPPPPPPPPPWWWO',
-    '...PPPPP...........WWWWO',
-    '...PPPP',
-    '...PPPP',
+    '...PPPPPPPPP',
+    '...PPPPPPPPP',
+    '...PPPPPPPPPPPPPPPPWWW',
+    '...PPPPPPPPPPPPPPPPWWWO',
+    '...PPPPP..........WWWWO',
     '...PPPP',
     '...PPPP',
     '...PPPP',
@@ -471,7 +474,8 @@ const LEGS = {
   ],
 };
 
-const SPRITE_ROWS = BODY.length + 12; // 足元までの行数（走り・キック基準）
+const HEM_OVERLAP = 3; // だぼっとした裾が脚に重なる行数
+const SPRITE_ROWS = BODY.length - HEM_OVERLAP + 12; // 足元までの行数（走り・キック基準）
 
 function drawPixels(c, rows, x, y) {
   rows.forEach((row, r) => {
@@ -487,7 +491,7 @@ function drawPixels(c, rows, x, y) {
 function drawFuji(c, x, baseY, pose, bob = 0) {
   // 足元（最終行の下）が baseY に来るように配置。ジャンプは脚を畳むので少し上がる
   const top = baseY - SPRITE_ROWS * PIXEL;
-  drawPixels(c, LEGS[pose], x, top + BODY.length * PIXEL);
+  drawPixels(c, LEGS[pose], x, top + (BODY.length - HEM_OVERLAP) * PIXEL);
   drawPixels(c, BODY, x, top + bob); // 走りの上下動は上半身だけ（沈み込む）
 }
 
