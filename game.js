@@ -533,11 +533,11 @@ function drawPixels(c, rows, x, y) {
   c.drawImage(img, x, y, img.width * PIXEL, img.height * PIXEL);
 }
 
-function drawFuji(c, x, baseY, pose, bob = 0) {
+function drawFuji(c, x, baseY, pose) {
   // 足元（最終行の下）が baseY に来るように配置。ジャンプは脚を畳むので少し上がる
   const top = baseY - SPRITE_ROWS * PIXEL;
   drawPixels(c, LEGS[pose], x, top + (BODY.length - HEM_OVERLAP) * PIXEL);
-  drawPixels(c, BODY, x, top + bob); // 走りの上下動は上半身だけ（沈み込む）
+  drawPixels(c, BODY, x, top); // 本家の恐竜と同じく、走るときに動くのは脚だけ
 }
 
 function drawPlayer() {
@@ -545,8 +545,7 @@ function drawPlayer() {
   if (player.kickTimer > 0) pose = 'kick';
   else if (!player.onGround) pose = 'jump';
   else pose = Math.floor(player.runPhase / 2) % 2 === 0 ? 'run1' : 'run2';
-  const bob = pose === 'run2' ? PIXEL : 0;
-  drawFuji(ctx, player.x - 1, Math.round(sy(player.y)), pose, bob);
+  drawFuji(ctx, player.x - 1, Math.round(sy(player.y)), pose);
 }
 
 function drawBeer(x, y, w, h) {
