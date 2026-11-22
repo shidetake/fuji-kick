@@ -128,7 +128,8 @@ let obstacleHistory = []; // 直近に出した種類（新しい順）
 let runningTime = 0;
 let flying = [];       // 蹴られて飛んでいくビール
 let particles = [];
-let groundOffset = 0;
+let groundScroll = 0;  // 地面がどれだけ流れたか（px）
+let clouds = [];
 let overMessage = '';
 let overTime = 0;
 let clock = 0;
@@ -348,7 +349,8 @@ function update(dt) {
   const dx = speed * dt;
   distance += dx;
   score += dx / 10;
-  groundOffset = (groundOffset + dx) % 40;
+  groundScroll += dx;
+  updateClouds(dt);
 
   // プレイヤー
   updateJump(dt);
@@ -410,17 +412,111 @@ function updateEffects(dt) {
 // ゲーム内の座標（y は地面からの高さ）を画面座標に
 const sy = (y) => GROUND_Y - y;
 
+// ===== 地面（本家と同じく、1区間ごとに平ら / デコボコをランダムに決めてつなげる。絵は自作） =====
+const GROUND_SEGMENT_W = 600 * SCALE;
+const GROUND_BUMP_PROB = 0.5;
+const groundImages = new Map();
+
+// 区間ごとに決まった乱数（何度描いても同じ形になるように）
+function seededRandom(seed) {
+  let t = (seed * 2654435761) >>> 0;
+  return () => {
+    t = (t + 0x6d2b79f5) >>> 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r ^= r + Math.imul(r ^ (r >>> 7), 61 | r);
+    return ((r ^ (r >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function groundImage(index) {
+  if (groundImages.has(index)) return groundImages.get(index);
+  const rnd = seededRandom(index + 1);
+  const img = document.createElement('canvas');
+  img.width = GROUND_SEGMENT_W;
+  img.height = 24;
+  const c = img.getContext('2d');
+  c.fillStyle = COLOR.ink;
+  const LINE_Y = 6; // 地面の線の位置（画像の上から）
+  // 地面の線。デコボコの区間は、ところどころ盛り上がったり凹んだりする
+  const heights = new Array(GROUND_SEGMENT_W).fill(0);
+  if (rnd() < GROUND_BUMP_PROB) {
+    for (let x = 20 + rnd() * 60; x < GROUND_SEGMENT_W - 40; x += 50 + rnd() * 150) {
+      const w = 2 * (4 + Math.floor(rnd() * 7)); // 8〜20px
+      const h = rnd() < 0.75 ? -2 * (1 + Math.floor(rnd() * 2)) : 2; // 多くは盛り上がり（2〜4px）、たまに凹み
+      for (let i = 0; i < w; i += 2) {
+        const edge = Math.min(i, w - 2 - i);
+        const v = Math.sign(h) * Math.min(Math.abs(h), edge + 2);
+        heights[Math.floor(x / 2) * 2 + i] = v;
+        heights[Math.floor(x / 2) * 2 + i + 1] = v;
+      }
+    }
+  }
+  for (let x = 0; x < GROUND_SEGMENT_W; x += 2) {
+    c.fillRect(x, LINE_Y + heights[x], 2, 2);
+    if (heights[x] < 0) c.fillRect(x, LINE_Y + heights[x], 2, -heights[x]); // 盛り上がりの中を塗る
+  }
+  // 線の下の小石や砂
+  for (let x = rnd() * 20; x < GROUND_SEGMENT_W; x += 8 + rnd() * 30) {
+    const y = LINE_Y + 5 + Math.floor(rnd() * 12);
+    const w = rnd() < 0.3 ? 2 : 2 + Math.floor(rnd() * 3) * 2;
+    c.fillRect(Math.floor(x), y, w, 2);
+  }
+  groundImages.set(index, img);
+  // 画面外に流れた区間の画像は捨てる
+  for (const k of groundImages.keys()) if (k < index - 2) groundImages.delete(k);
+  return img;
+}
+
 function drawGround() {
-  ctx.strokeStyle = COLOR.ink;
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(0, GROUND_Y + 0.5);
-  ctx.lineTo(W, GROUND_Y + 0.5);
-  ctx.stroke();
-  ctx.fillStyle = COLOR.sub;
-  for (let x = -groundOffset; x < W; x += 40) {
-    ctx.fillRect(x + 8, GROUND_Y + 8, 6, 2);
-    ctx.fillRect(x + 27, GROUND_Y + 15, 3, 2);
+  const first = Math.floor(groundScroll / GROUND_SEGMENT_W);
+  for (let i = first; i * GROUND_SEGMENT_W - groundScroll < W; i++) {
+    ctx.drawImage(groundImage(i), Math.round(i * GROUND_SEGMENT_W - groundScroll), GROUND_Y - 6);
+  }
+}
+
+// ===== 雲（本家 cloud.ts / horizon.ts と同じ出方。絵は自作） =====
+const CLOUD_SPEED = dino(1);        // 本家は速度に関係なく 1px/フレーム
+const CLOUD_MIN_GAP = 100 * SCALE;
+const CLOUD_MAX_GAP = 400 * SCALE;
+const CLOUD_MIN_Y = 30 * SCALE;     // 画面上端から
+const CLOUD_MAX_Y = 71 * SCALE;
+const CLOUD_FREQUENCY = 0.5;        // 1フレームごとに新しい雲を出す確率
+const MAX_CLOUDS = 6;
+const CLOUD_DOT = 2.4;
+const CLOUD_ROWS = [
+  '..........oooooo...............',
+  '........oofffffoo..............',
+  '.......offffffffo..oooo........',
+  '...ooooffffffffffoofffoo.......',
+  '.oofffffffffffffffffffffoooo...',
+  'offffffffffffffffffffffffffoo..',
+  'offfffffffffffffffffffffffffo..',
+  '.ooooooooooooooooooooooooooo...',
+];
+const CLOUD_PALETTE = { o: '#d0d0d0', f: '#ffffff' };
+
+function addCloud() {
+  clouds.push({
+    x: W,
+    y: CLOUD_MIN_Y + Math.random() * (CLOUD_MAX_Y - CLOUD_MIN_Y),
+    gap: CLOUD_MIN_GAP + Math.random() * (CLOUD_MAX_GAP - CLOUD_MIN_GAP),
+  });
+}
+
+function updateClouds(dt) {
+  if (!clouds.length) { addCloud(); return; }
+  for (const cl of clouds) cl.x -= CLOUD_SPEED * dt;
+  clouds = clouds.filter((cl) => cl.x + CLOUD_ROWS[0].length * CLOUD_DOT > 0);
+  const last = clouds.at(-1);
+  const prob = 1 - Math.pow(1 - CLOUD_FREQUENCY, dt * FPS); // フレームレートが違っても本家と同じ頻度に
+  if (clouds.length < MAX_CLOUDS && (!last || W - last.x > last.gap) && Math.random() < prob) addCloud();
+}
+
+function drawClouds() {
+  const img = pixelImage(CLOUD_ROWS, CLOUD_PALETTE);
+  ctx.imageSmoothingEnabled = false;
+  for (const cl of clouds) {
+    ctx.drawImage(img, Math.round(cl.x), Math.round(cl.y), img.width * CLOUD_DOT, img.height * CLOUD_DOT);
   }
 }
 
@@ -783,6 +879,7 @@ function drawCenter(lines) {
 function draw() {
   ctx.fillStyle = COLOR.bg;
   ctx.fillRect(0, 0, W, H);
+  drawClouds();
   drawGround();
   drawObstacles();
   drawPlayer();
@@ -825,6 +922,10 @@ function autoPlay() {
   if (o.type === 'beer' && t <= KICK_WINDOW * 0.5) press();
   if (o.type !== 'beer' && t <= KICK_WINDOW + 0.12 && t > KICK_WINDOW) press();
 }
+
+// タイトル画面でも空に雲が1つ見えるように
+addCloud();
+clouds[0].x = W * 0.65;
 
 // ===== ループ =====
 let last = performance.now();
