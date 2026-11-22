@@ -29,6 +29,7 @@
   const status = el('ranking-status');
 
   let pending = null;   // 名前の入力待ちのスコア
+  let character = 'fuji'; // どのキャラのランキングを表示しているか
   let editing = false;  // 名前の入力欄を開いているか
 
   nameInput.maxLength = NAME_MAX;
@@ -89,7 +90,9 @@
   }
 
   async function request(method, body) {
-    const url = method === 'GET' ? `${API}?player=${encodeURIComponent(playerId())}` : API;
+    const url = method === 'GET'
+      ? `${API}?player=${encodeURIComponent(playerId())}&character=${encodeURIComponent(character)}`
+      : API;
     const res = await fetch(url, {
       method,
       headers: body ? { 'Content-Type': 'application/json' } : undefined,
@@ -102,7 +105,7 @@
   async function submit(result) {
     status.textContent = '送信中…';
     try {
-      render(await request('POST', { player: playerId(), name: storage.get('fuji-kick-name'), ...result }));
+      render(await request('POST', { player: playerId(), name: storage.get('fuji-kick-name'), character, ...result }));
     } catch (e) {
       console.error(e);
       status.textContent = 'ランキングに接続できませんでした';
@@ -133,7 +136,7 @@
       // 名前の変更だけ
       status.textContent = '送信中…';
       try {
-        render(await request('POST', { player: playerId(), name: storage.get('fuji-kick-name') }));
+        render(await request('POST', { player: playerId(), name: storage.get('fuji-kick-name'), character }));
       } catch (err) {
         console.error(err);
         status.textContent = 'ランキングに接続できませんでした';
@@ -148,11 +151,15 @@
   });
   el('rename-button').addEventListener('click', openNameForm);
   el('retry-button').addEventListener('click', () => press());
+  el('change-char-button').addEventListener('click', () => goTitle());
 
   window.FujiRanking = {
     onGameOver(result) {
+      character = result.character || 'fuji';
+      el('ranking-title').textContent = `ランキング TOP10（${CHARACTERS[character].name}）`;
       el('result-message').textContent = overMessage;
-      el('result-score').textContent = `SCORE ${String(result.score).padStart(5, '0')}  🍺 × ${result.kicks}`;
+      el('result-score').textContent = `SCORE ${String(result.score).padStart(5, '0')}` +
+        (CHARACTERS[character].canKick ? `  🍺 × ${result.kicks}` : '');
       list.innerHTML = '';
       show();
       if (!storage.get('fuji-kick-name')) {

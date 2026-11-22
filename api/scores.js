@@ -1,13 +1,14 @@
 // ランキング API（Vercel Function）
-//   GET  /api/scores?player=<id>  … トップ10と自分の順位
-//   POST /api/scores { player, name, score, kicks, duration } … スコア登録（自己ベストのみ残す）
+//   GET  /api/scores?player=<id>&character=<fuji|mio>  … トップ10と自分の順位
+//   POST /api/scores { player, name, character, score, kicks, duration } … スコア登録（自己ベストのみ残す）
 //   POST /api/scores { player, name } … 名前だけ変更
 //
-// データは Upstash Redis に保存する。
-//   fk:scores … ソート済みセット（member = プレイヤーID, score = 自己ベスト）
-//   fk:names  … ハッシュ（プレイヤーID → 名前）
+// データは Upstash Redis に保存する。ランキングはキャラごとに分ける。
+//   fk:scores     … 藤くんのランキング。ソート済みセット（member = プレイヤーID, score = 自己ベスト）
+//   fk:scores:mio … みおちゃんのランキング
+//   fk:names      … ハッシュ（プレイヤーID → 名前）。キャラ共通
 
-const SCORES_KEY = 'fk:scores';
+const scoresKey = (character) => (character === 'mio' ? 'fk:scores:mio' : 'fk:scores');
 const NAMES_KEY = 'fk:names';
 const TOP_N = 10;
 const NAME_MAX = 10;
@@ -50,11 +51,12 @@ function isPlausible(score, kicks, duration) {
   return score <= duration * MAX_POINTS_PER_SEC + kicks * KICK_BONUS + 10;
 }
 
-async function ranking(player) {
+async function ranking(player, character) {
+  const key = scoresKey(character);
   const [top, myRank, myScore] = await redis([
-    ['ZREVRANGE', SCORES_KEY, 0, TOP_N - 1, 'WITHSCORES'],
-    ['ZREVRANK', SCORES_KEY, player || '-'],
-    ['ZSCORE', SCORES_KEY, player || '-'],
+    ['ZREVRANGE', key, 0, TOP_N - 1, 'WITHSCORES'],
+    ['ZREVRANK', key, player || '-'],
+    ['ZSCORE', key, player || '-'],
   ]);
   const ids = [];
   for (let i = 0; i < top.length; i += 2) ids.push(top[i]);
@@ -78,7 +80,7 @@ module.exports = async (req, res) => {
   try {
     if (req.method === 'GET') {
       const player = isPlayerId(req.query.player) ? req.query.player : null;
-      res.status(200).json(await ranking(player));
+      res.status(200).json(await ranking(player, req.query.character));
       return;
     }
     if (req.method === 'POST') {
@@ -98,10 +100,10 @@ module.exports = async (req, res) => {
           res.status(400).json({ error: 'implausible score' });
           return;
         }
-        commands.push(['ZADD', SCORES_KEY, 'GT', score, player]); // 自己ベストを更新したときだけ書き換わる
+        commands.push(['ZADD', scoresKey(body.character), 'GT', score, player]); // 自己ベストを更新したときだけ書き換わる
       }
       await redis(commands);
-      res.status(200).json(await ranking(player));
+      res.status(200).json(await ranking(player, body.character));
       return;
     }
     res.setHeader('Allow', 'GET, POST');

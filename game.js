@@ -86,6 +86,15 @@ function startSpeed() {
 resize();
 window.addEventListener('resize', resize);
 
+// ===== キャラの選択（前回のキャラを覚えておく） =====
+function loadCharacter() {
+  try { return localStorage.getItem('fuji-kick-character') === 'mio' ? 'mio' : 'fuji'; } catch { return 'fuji'; }
+}
+function setCharacter(id) {
+  characterId = id === 'mio' ? 'mio' : 'fuji';
+  try { localStorage.setItem('fuji-kick-character', characterId); } catch { /* 無視 */ }
+}
+
 // ===== ハイスコア =====
 function loadHigh() {
   try { return Number(localStorage.getItem('fuji-kick-high')) || 0; } catch { return 0; }
@@ -108,6 +117,7 @@ const player = {
 };
 
 let state = 'title';   // title | playing | over
+let characterId = loadCharacter(); // fuji | mio
 let speed = START_SPEED;
 let distance = 0;
 let kicks = 0;
@@ -208,25 +218,45 @@ function gameOver(message) {
     saveHigh(high);
   }
   // ランキング（ranking.js）にスコアを渡す
-  window.FujiRanking?.onGameOver({ score: Math.floor(score), kicks, duration: runningTime });
+  window.FujiRanking?.onGameOver({ score: Math.floor(score), kicks, duration: runningTime, character: characterId });
 }
 
 // ===== 入力（1ボタン） =====
+// ゲーム開始（id を渡すとそのキャラに切り替えてから始める）
+function startGame(id) {
+  if (id) setCharacter(id);
+  window.FujiSelect?.hide();
+  window.FujiRanking?.hide();
+  reset();
+  state = 'playing';
+}
+
+// タイトル（キャラ選択）に戻る
+function goTitle() {
+  window.FujiRanking?.hide();
+  reset();
+  state = 'title';
+  window.FujiSelect?.show();
+}
+
 function press() {
   if (state === 'title') {
-    reset();
-    state = 'playing';
+    startGame();
     return;
   }
   if (state === 'over') {
     if (clock - overTime < 0.6) return; // 連打で即リトライしないように
     if (window.FujiRanking?.blocksRetry()) return; // 名前の入力中など
-    window.FujiRanking?.hide();
-    reset();
-    state = 'playing';
+    startGame();
     return;
   }
   if (!player.onGround || player.kickTimer > KICK_DURATION - KICK_LOCK) return;
+
+  // みおちゃんはビールを蹴らない。いつでもジャンプ
+  if (!currentCharacter().canKick) {
+    startJump();
+    return;
+  }
 
   const target = nearestAhead();
   if (target && timeToReach(target) <= KICK_WINDOW) {
@@ -343,7 +373,7 @@ function update(dt) {
   const px2 = player.x + player.w - 6;
   for (const o of obstacles) {
     if (o.kicked) continue;
-    if (o.type === 'beer') {
+    if (o.type === 'beer' && currentCharacter().canKick) {
       // ビールが体の後ろ側まで来たのに蹴っていない → アウト
       if (o.x < player.x + TRIP_OFFSET) {
         if (player.onGround) {
@@ -357,7 +387,7 @@ function update(dt) {
       const overlapX = o.x < px2 && o.x + o.w > px1;
       const overlapY = player.y < o.h - 4;
       if (overlapX && overlapY) {
-        gameOver('コーラにぶつかった！');
+        gameOver(o.type === 'beer' ? 'ビールにぶつかった！' : 'コーラにぶつかった！');
         return;
       }
     }
@@ -507,14 +537,64 @@ const LEGS = {
   ],
 };
 
+// ===== みおちゃんのドット絵（仮。写真をもらったら描き直す） =====
+const MIO_PALETTE = {
+  ...PALETTE,
+  H: '#5b3a26', // 髪（茶色のロング）
+  h: '#7a5038', // 髪のツヤ
+  K: '#efe7dc', // クリーム色のニット
+  k: '#d6cbbb', // ニットの影
+  P: '#7d93b0', // デニム
+  W: '#ffffff', // 白いスニーカー
+  O: '#c8c8c8', // ソール
+};
+
+const MIO_BODY = [
+  '.....HHHHHH',
+  '...HHHHHHHHHH',
+  '..HHHHHhhHHHHH',
+  '.HHHHHHHHhhHHHH',
+  '.HHHHHHHHHHHHHHH',
+  'HHHHHHHHHHHHHHHH',
+  'HHHHHHHHHHHHHHHH',
+  'HHHHHHHHHHHHHHHH',
+  'HHHHHHHHSSSHHHHS',
+  'HHHHHHSSSSSSSSSS',
+  'HHHHHsSSSEESSEES',
+  'HHHHSsSSSSSSSSSS',
+  'HHHHSSSSSSMMMSS',
+  'HHHHHsSSSSSSSS',
+  'HHHHHHsSSSS',
+  'HHHHHKKKKKKKK',
+  'HHHHKKKKKKKKKK',
+  'HHHHKkKKKKKKKK',
+  '.HHKKkKKKKKKKK',
+  '..KKKkKKKKKKK',
+  '..KKKkKKKKKKK',
+  '..KKKkKKKKKKK',
+  '..KKKkKKKKKKK',
+  '..KKKkKKKKKKK',
+  '..KKKSSKKKKKK',
+  '..kkkkkkkkkkk',
+];
+
 const HEM_OVERLAP = 0; // 裾が脚に重なる行数
 const SPRITE_ROWS = BODY.length - HEM_OVERLAP + 12; // 足元までの行数（走り・キック基準）
+
+// 選べるキャラ。canKick: ビールを蹴れるか（false ならビールもジャンプで避ける）
+const CHARACTERS = {
+  fuji: { name: '藤くん', canKick: true, rule: 'ビールは蹴る / コーラは跳ぶ', body: BODY, legs: LEGS, palette: PALETTE },
+  mio: { name: 'みおちゃん', canKick: false, rule: 'ビールもコーラも跳んで避ける', body: MIO_BODY, legs: LEGS, palette: MIO_PALETTE },
+};
+const currentCharacter = () => CHARACTERS[characterId];
 
 // ドット絵は 1ドット=1px の画像にしてから拡大して描く。
 // 1ドットずつ fillRect すると、半端な倍率のときにドットの間に隙間（網目）が出るため。
 const pixelImages = new Map();
-function pixelImage(rows) {
-  let img = pixelImages.get(rows);
+function pixelImage(rows, palette) {
+  if (!pixelImages.has(palette)) pixelImages.set(palette, new Map());
+  const cache = pixelImages.get(palette);
+  let img = cache.get(rows);
   if (!img) {
     img = document.createElement('canvas');
     img.width = Math.max(...rows.map((r) => r.length));
@@ -522,28 +602,32 @@ function pixelImage(rows) {
     const c = img.getContext('2d');
     rows.forEach((row, r) => {
       for (let i = 0; i < row.length; i++) {
-        const color = PALETTE[row[i]];
+        const color = palette[row[i]];
         if (!color) continue;
         c.fillStyle = color;
         c.fillRect(i, r, 1, 1);
       }
     });
-    pixelImages.set(rows, img);
+    cache.set(rows, img);
   }
   return img;
 }
 
-function drawPixels(c, rows, x, y) {
-  const img = pixelImage(rows);
+function drawPixels(c, rows, x, y, palette = PALETTE) {
+  const img = pixelImage(rows, palette);
   c.imageSmoothingEnabled = false;
   c.drawImage(img, x, y, img.width * PIXEL, img.height * PIXEL);
 }
 
+// キャラを描く。足元（最終行の下）が baseY に来るように配置する
+function drawCharacter(c, ch, x, baseY, pose) {
+  const top = baseY - (ch.body.length - HEM_OVERLAP + 12) * PIXEL;
+  drawPixels(c, ch.legs[pose], x, top + (ch.body.length - HEM_OVERLAP) * PIXEL, ch.palette);
+  drawPixels(c, ch.body, x, top, ch.palette); // 本家の恐竜と同じく、走るときに動くのは脚だけ
+}
+
 function drawFuji(c, x, baseY, pose) {
-  // 足元（最終行の下）が baseY に来るように配置。ジャンプは脚を畳むので少し上がる
-  const top = baseY - SPRITE_ROWS * PIXEL;
-  drawPixels(c, LEGS[pose], x, top + (BODY.length - HEM_OVERLAP) * PIXEL);
-  drawPixels(c, BODY, x, top); // 本家の恐竜と同じく、走るときに動くのは脚だけ
+  drawCharacter(c, CHARACTERS.fuji, x, baseY, pose);
 }
 
 function drawPlayer() {
@@ -551,7 +635,7 @@ function drawPlayer() {
   if (player.kickTimer > 0) pose = 'kick';
   else if (!player.onGround) pose = 'jump';
   else pose = Math.floor(player.runPhase / 2) % 2 === 0 ? 'run1' : 'run2';
-  drawFuji(ctx, player.x - 1, Math.round(sy(player.y)), pose);
+  drawCharacter(ctx, currentCharacter(), player.x - 1, Math.round(sy(player.y)), pose);
 }
 
 function drawBeer(x, y, w, h) {
@@ -675,7 +759,7 @@ function drawHud() {
   ctx.textAlign = 'right';
   ctx.fillText(`HI ${pad(high)}  ${pad(score)}`, W - 16, 28);
   ctx.textAlign = 'left';
-  ctx.fillText(`🍺 × ${kicks}`, 16, 28);
+  if (currentCharacter().canKick) ctx.fillText(`🍺 × ${kicks}`, 16, 28);
 }
 
 function drawCenter(lines) {
@@ -697,6 +781,7 @@ function draw() {
   drawPlayer();
 
   if (state === 'title') {
+    if (window.FujiSelect) return; // キャラ選択画面（select.js）が出ている
     drawCenter([
       ['FUJI-KICK', 40, true],
       ['ビールは引きつけて蹴る / コーラは早めにジャンプ', 16, false],

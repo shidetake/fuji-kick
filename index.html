@@ -90,22 +90,64 @@
     }
     .buttons button.primary, #name-form button.primary { background: #535353; color: #ffffff; }
     .hint { margin: 6px 0 0; font-size: 12px; color: #a0a0a0; }
-    .card { display: flex; flex-direction: column; }
+    .buttons { flex-wrap: wrap; }
+
+    /* ===== タイトルのキャラ選択 ===== */
+    .select-card .lead { margin: 2px 0 8px; font-size: 14px; }
+    .chars { display: flex; gap: 10px; justify-content: center; }
+    .char-button {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 2px;
+      padding: 8px 4px;
+      font: inherit;
+      color: #535353;
+      background: #ffffff;
+      border: 2px solid #c8c8c8;
+      border-radius: 8px;
+    }
+    .char-button.selected { border-color: #f2a81d; background: #fff7e8; }
+    .char-button canvas { image-rendering: pixelated; }
+    .char-name { font-weight: bold; font-size: 15px; }
+    .char-rule { font-size: 11px; color: #888888; }
+    #ranking .card { display: flex; flex-direction: column; }
     /* スマホ縦持ちなど：ランキングを先に、ボタンを最後に */
-    .card .result { display: contents; }
-    .card #actions { order: 2; }
-    .card .board { order: 1; }
+    #ranking .card .result { display: contents; }
+    #ranking .card #actions { order: 2; }
+    #ranking .card .board { order: 1; }
     /* 横持ちなど画面が低いとき：左に結果とボタン、右にランキングの2列 */
     @media (max-height: 520px) and (min-width: 560px) {
-      .card { width: min(640px, calc(100vw - 32px)); flex-direction: row; gap: 16px; align-items: center; }
-      .card .result { display: block; flex: 1; }
-      .card .board { flex: 1; }
-      .card h2 { margin-top: 0; }
+      #ranking .card { width: min(640px, calc(100vw - 32px)); flex-direction: row; gap: 16px; align-items: center; }
+      #ranking .card .result { display: block; flex: 1; }
+      #ranking .card .board { flex: 1; }
+      #ranking .card h2 { margin-top: 0; }
     }
   </style>
 </head>
 <body>
   <canvas id="game"></canvas>
+
+  <div id="select" class="overlay" hidden>
+    <div class="card ui select-card">
+      <h1>FUJI-KICK</h1>
+      <p class="lead">キャラを選んでスタート</p>
+      <div class="chars">
+        <button type="button" class="char-button" data-char="fuji">
+          <canvas></canvas>
+          <span class="char-name"></span>
+          <span class="char-rule"></span>
+        </button>
+        <button type="button" class="char-button" data-char="mio">
+          <canvas></canvas>
+          <span class="char-name"></span>
+          <span class="char-rule"></span>
+        </button>
+      </div>
+      <p class="hint">枠の外をタップ / スペースで前回のキャラ（←→ で切り替え）</p>
+    </div>
+  </div>
 
   <div id="ranking" class="overlay" hidden>
     <div class="card ui">
@@ -126,6 +168,7 @@
       <div id="actions">
         <div class="buttons">
           <button type="button" id="rename-button">名前を変える</button>
+          <button type="button" id="change-char-button">キャラを変える</button>
           <button type="button" id="retry-button" class="primary">もう一回</button>
         </div>
         <p class="hint">枠の外をタップ / スペースでもリトライ</p>
@@ -133,7 +176,7 @@
       </div>
 
       <div class="col board">
-      <h2>ランキング TOP10</h2>
+      <h2 id="ranking-title">ランキング TOP10</h2>
       <p id="ranking-status"></p>
       <ol id="ranking-list"></ol>
       </div>
@@ -142,5 +185,6 @@
 
   <script src="game.js"></script>
   <script src="ranking.js"></script>
+  <script src="select.js"></script>
 </body>
 </html>
