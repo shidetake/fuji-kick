@@ -1,20 +1,51 @@
 'use strict';
 
 // ===== 設定 =====
-const W = 800;              // 論理解像度（横）
-const H = 260;              // 論理解像度（縦）
-const GROUND_Y = 220;       // 地面の高さ
-const GRAVITY = 2400;       // px/s^2
-const JUMP_VELOCITY = 720;  // px/s
+// ゲームバランスは Chrome の恐竜ゲーム（chromium/components/neterror/resources/dino_game）に合わせている。
+// 本家の値（600x150 のステージ、px/フレーム @60fps）を SCALE 倍して px/秒 に直して使う。
+const SCALE = 1.6;          // 本家の恐竜(47px)と藤くん(74px)の身長比
+const FPS = 60;
+const dino = (v) => v * SCALE * FPS;          // 本家の 速度(px/フレーム) → px/秒
+const dinoAcc = (v) => v * SCALE * FPS * FPS; // 本家の 加速度(px/フレーム^2) → px/秒^2
+
+const W = 600 * SCALE;      // 960
+const H = 150 * SCALE;      // 240
+const GROUND_Y = H - 10 * SCALE; // 本家の bottomPad 10
+
+// 速度（本家: speed 6, maxSpeed 13, acceleration 0.001/フレーム）
+const START_SPEED = dino(6);
+const MAX_SPEED = dino(13);
+const ACCEL = dinoAcc(0.001);
+
+// ジャンプ（本家 trex.ts の normalJumpConfig）
+const GRAVITY = dinoAcc(0.6);
+const JUMP_BASE = 10;               // 初速 = 10 + 速度/10 （本家の単位）
+const MIN_JUMP_HEIGHT = 30 * SCALE; // これより上がるまではボタンを離しても上昇を続ける
+const MAX_JUMP_HEIGHT = 63 * SCALE; // ここまで来たら減速（本家は画面上端から30px = 地面から63px）
+const DROP_VELOCITY = dino(5);      // 減速後の上昇速度
+
+// 障害物（本家: gapCoefficient 0.6, maxGapCoefficient 1.5, maxObstacleDuplication 2, clearTime 3000ms）
+const GAP_COEFFICIENT = 0.6;
+const MAX_GAP_COEFFICIENT = 1.5;
+const MAX_DUPLICATION = 2;
+const CLEAR_TIME = 3;               // 最初の障害物が出るまでの秒数
+
+// fuji-kick 独自
 const KICK_WINDOW = 0.06;   // 障害物到達まで何秒以内に押したらキックになるか
 const TRIP_OFFSET = 4;      // ビールがプレイヤー左端からこの位置(px)まで来たらつまづく
 const KICK_DURATION = 0.18; // キックポーズの長さ（秒）
 const KICK_LOCK = 0.08;     // キック直後、次の入力を受け付けない時間（秒）
-const START_SPEED = 360;    // px/s
-const MAX_SPEED = 900;
-const ACCEL = 9;            // 1秒ごとの加速量
-const BEER_RATIO = 0.6;     // ビールが出る確率
+const BEER_RATIO = 0.6;     // ビールが出る確率（残りはコーラ瓶とペットボトルが半々）
 const KICK_BONUS = 50;      // ビール1杯蹴るごとのボーナス
+const EFFECT_GRAVITY = 2400; // 蹴ったビールや泡の落ち方
+
+// 障害物の種類。minGap / multipleSpeed は本家のサボテンの値（本家の単位）
+const OBSTACLE_TYPES = {
+  beer:   { w: 26, h: 36, minGap: 120, multipleSpeed: Infinity }, // 小サボテン相当。並びはなし
+  cola:   { w: 18, h: 48, minGap: 120, multipleSpeed: 4 },        // 小サボテン相当
+  bigCola: { w: 24, h: 60, minGap: 120, multipleSpeed: 7 },       // 大サボテン相当
+};
+const MAX_OBSTACLE_LENGTH = 3; // 最大何本並ぶか
 
 const COLOR = {
   bg: '#f7f7f7',
@@ -50,14 +81,15 @@ function saveHigh(v) {
 
 // ===== 状態 =====
 const player = {
-  x: 70,
+  x: 50 * SCALE,
   w: 34,
-  h: 56,
   y: 0,       // 地面からの高さ（上が正）
   vy: 0,
+  jumping: false,
+  reachedMinHeight: false,
   kickTimer: 0,
   runPhase: 0,
-  get onGround() { return this.y <= 0; },
+  get onGround() { return !this.jumping; },
 };
 
 let state = 'title';   // title | playing | over
@@ -67,9 +99,10 @@ let kicks = 0;
 let score = 0;
 let high = loadHigh();
 let obstacles = [];
+let obstacleHistory = []; // 直近に出した種類（新しい順）
+let runningTime = 0;
 let flying = [];       // 蹴られて飛んでいくビール
 let particles = [];
-let spawnTimer = 0;
 let groundOffset = 0;
 let overMessage = '';
 let overTime = 0;
@@ -78,120 +111,70 @@ let clock = 0;
 function reset() {
   player.y = 0;
   player.vy = 0;
+  player.jumping = false;
   player.kickTimer = 0;
   speed = START_SPEED;
   distance = 0;
   kicks = 0;
   score = 0;
   obstacles = [];
+  obstacleHistory = [];
+  runningTime = 0;
   flying = [];
   particles = [];
-  spawnTimer = 1.0;
-  queue = [];
-  planned = { last: null, streak: 0 };
 }
 
-// ===== 障害物の出し方 =====
-// 出す予定の障害物を { type, gap } のキューで持つ。gap は「1つ前の障害物から何秒後に来るか」。
+// ===== 障害物の出し方（本家 horizon.ts / obstacle.ts と同じ） =====
+const randInt = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
+const dinoSpeed = () => speed / (SCALE * FPS); // 本家の単位の速度
 
-// 直前→次 の組み合わせごとの最短間隔（秒）。これより詰めると人間には無理になる。
-const MIN_GAP = {
-  beer: { beer: 0.35, cola: 0.55 }, // キックは一瞬なので詰められる
-  cola: { beer: 0.70, cola: 0.85 }, // ジャンプは着地を待つ必要がある
-};
-const MAX_STREAK = { beer: 5, cola: 3 }; // 同じ種類はこれ以上続けない
+function pickType() {
+  if (Math.random() < BEER_RATIO) return 'beer';
+  return Math.random() < 0.5 ? 'cola' : 'bigCola';
+}
 
-// ときどき出す決まった並び
-const PATTERNS = [
-  { name: '連続キック', types: ['beer', 'beer', 'beer'], weight: 3 },
-  { name: '着地して蹴る', types: ['cola', 'beer'], weight: 2 },
-  { name: '蹴って跳ぶ', types: ['beer', 'cola'], weight: 2 },
-  { name: '連続ジャンプ', types: ['cola', 'cola'], weight: 1 },
-];
+// 同じ種類が MAX_DUPLICATION 回続いていたら true
+function isDuplicate(type) {
+  let count = 0;
+  for (const t of obstacleHistory) count = t === type ? count + 1 : 0;
+  return count >= MAX_DUPLICATION;
+}
 
-let queue = [];
-let planned = { last: null, streak: 0 }; // キューに積んだ最後の種類と、その連続数
+function addNewObstacle() {
+  let type = pickType();
+  while (isDuplicate(type)) type = pickType();
+  const conf = OBSTACLE_TYPES[type];
+  const sd = dinoSpeed();
+  let size = randInt(1, MAX_OBSTACLE_LENGTH);
+  if (size > 1 && conf.multipleSpeed > sd) size = 1;
+  const width = conf.w * size;
+  // 本家: minGap = 幅 × 速度 + minGap × gapCoefficient、maxGap = minGap × 1.5（本家の単位で計算して拡大）
+  const minGap = (width / SCALE) * sd + conf.minGap * GAP_COEFFICIENT;
+  const gap = (minGap + Math.random() * (minGap * MAX_GAP_COEFFICIENT - minGap)) * SCALE;
+  obstacles.push({
+    type, size, x: W + conf.w, w: width, unitW: conf.w, h: conf.h, gap,
+    kicked: false, followingCreated: false,
+  });
+  obstacleHistory.unshift(type);
+  obstacleHistory.length = Math.min(obstacleHistory.length, MAX_DUPLICATION);
+}
 
-const lerp = (a, b, t) => a + (b - a) * t;
-const rand = (a, b) => a + Math.random() * (b - a);
-const progress = () => (speed - START_SPEED) / (MAX_SPEED - START_SPEED); // 0〜1
-
-// 普段の間隔：たまに詰まる / だいたい普通 / たまに休める
-function sampleGap(prev, next) {
-  const min = prev ? MIN_GAP[prev][next] : 0;
-  const p = progress();
-  const r = Math.random();
-  let gap;
-  if (r < 0.15) {
-    gap = min + rand(0, 0.1);                          // 詰まった間隔
-  } else if (r < 0.87) {
-    gap = rand(lerp(0.9, 0.7, p), lerp(1.7, 1.1, p));  // 普通
-  } else {
-    gap = rand(lerp(1.9, 1.4, p), lerp(2.7, 2.0, p));  // 休み
+function updateSpawning() {
+  if (runningTime < CLEAR_TIME) return;
+  const last = obstacles.at(-1);
+  if (!last) {
+    addNewObstacle();
+  } else if (!last.followingCreated && last.x + last.w + last.gap < W) {
+    addNewObstacle();
+    last.followingCreated = true;
   }
-  return Math.max(min, gap);
-}
-
-function wouldExceedStreak(types) {
-  let { last, streak } = planned;
-  for (const t of types) {
-    streak = t === last ? streak + 1 : 1;
-    last = t;
-    if (streak > MAX_STREAK[t]) return true;
-  }
-  return false;
-}
-
-function enqueue(type, gap) {
-  planned.streak = type === planned.last ? planned.streak + 1 : 1;
-  planned.last = type;
-  queue.push({ type, gap });
-}
-
-function fillQueue() {
-  const patternProb = lerp(0.15, 0.35, progress());
-  if (Math.random() < patternProb) {
-    const candidates = PATTERNS.filter((pt) => !wouldExceedStreak(pt.types));
-    const total = candidates.reduce((s, pt) => s + pt.weight, 0);
-    let r = Math.random() * total;
-    const pattern = candidates.find((pt) => (r -= pt.weight) < 0);
-    if (pattern) {
-      pattern.types.forEach((type, i) => {
-        const prev = planned.last;
-        // 1つ目は普段の間隔、2つ目以降は最短間隔ギリギリで詰める
-        const gap = i === 0 ? sampleGap(prev, type) : MIN_GAP[prev][type] + rand(0, 0.08);
-        enqueue(type, gap);
-      });
-      return;
-    }
-  }
-  // 単発
-  let type = Math.random() < BEER_RATIO ? 'beer' : 'cola';
-  if (wouldExceedStreak([type])) type = type === 'beer' ? 'cola' : 'beer';
-  enqueue(type, sampleGap(planned.last, type));
-}
-
-function peekNext() {
-  if (!queue.length) fillQueue();
-  return queue[0];
-}
-
-function spawnNext() {
-  const { type } = peekNext();
-  queue.shift();
-  if (type === 'beer') {
-    obstacles.push({ type: 'beer', x: W + 20, w: 26, h: 36 });
-  } else {
-    obstacles.push({ type: 'cola', x: W + 20, w: 18, h: 48 });
-  }
-  spawnTimer += peekNext().gap;
 }
 
 // 自分の前にある、まだ処理されていない一番近い障害物
 function nearestAhead() {
   let best = null;
   for (const o of obstacles) {
-    if (o.x + o.w < player.x) continue;
+    if (o.kicked || o.x + o.w < player.x) continue;
     if (!best || o.x < best.x) best = o;
   }
   return best;
@@ -230,17 +213,47 @@ function press() {
   if (target && timeToReach(target) <= KICK_WINDOW) {
     kick(target);
   } else {
-    player.vy = JUMP_VELOCITY;
+    startJump();
+  }
+}
+
+// ボタンを離した（本家と同じく、離すとジャンプが少し低くなる）
+function release() {
+  endJump();
+}
+
+function startJump() {
+  player.jumping = true;
+  player.reachedMinHeight = false;
+  player.vy = dino(JUMP_BASE + dinoSpeed() / 10);
+}
+
+function endJump() {
+  if (player.jumping && player.reachedMinHeight && player.vy > DROP_VELOCITY) {
+    player.vy = DROP_VELOCITY;
+  }
+}
+
+function updateJump(dt) {
+  if (!player.jumping) return;
+  player.y += player.vy * dt;
+  player.vy -= GRAVITY * dt;
+  if (player.y > MIN_JUMP_HEIGHT) player.reachedMinHeight = true;
+  if (player.y > MAX_JUMP_HEIGHT) endJump();
+  if (player.y <= 0) {
+    player.y = 0;
+    player.vy = 0;
+    player.jumping = false;
   }
 }
 
 function kick(o) {
   player.kickTimer = KICK_DURATION;
-  if (o.type === 'cola') {
+  if (o.type !== 'beer') {
     gameOver('コーラは蹴っちゃダメ！');
     return;
   }
-  obstacles.splice(obstacles.indexOf(o), 1);
+  o.kicked = true;
   flying.push({
     x: o.x, y: 0, w: o.w, h: o.h,
     vx: 250 + Math.random() * 150,
@@ -261,17 +274,21 @@ function kick(o) {
   score += KICK_BONUS;
 }
 
+const isActionKey = (e) => e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter';
 window.addEventListener('keydown', (e) => {
-  if (e.repeat) return;
-  if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter') {
-    e.preventDefault();
-    press();
-  }
+  if (!isActionKey(e)) return;
+  e.preventDefault();
+  if (!e.repeat) press();
+});
+window.addEventListener('keyup', (e) => {
+  if (isActionKey(e)) release();
 });
 canvas.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   press();
 });
+window.addEventListener('pointerup', release);
+window.addEventListener('pointercancel', release);
 
 // ===== 更新 =====
 function update(dt) {
@@ -281,6 +298,7 @@ function update(dt) {
     return;
   }
 
+  runningTime += dt;
   speed = Math.min(MAX_SPEED, speed + ACCEL * dt);
   const dx = speed * dt;
   distance += dx;
@@ -288,24 +306,20 @@ function update(dt) {
   groundOffset = (groundOffset + dx) % 40;
 
   // プレイヤー
-  if (!player.onGround || player.vy > 0) {
-    player.vy -= GRAVITY * dt;
-    player.y += player.vy * dt;
-    if (player.y <= 0) { player.y = 0; player.vy = 0; }
-  }
+  updateJump(dt);
   if (player.kickTimer > 0) player.kickTimer -= dt;
   player.runPhase += dt * speed / 40;
 
   // 障害物
-  spawnTimer -= dt;
-  while (spawnTimer <= 0) spawnNext();
   for (const o of obstacles) o.x -= dx;
   obstacles = obstacles.filter((o) => o.x + o.w > -50);
+  updateSpawning();
 
   // 当たり判定
   const px1 = player.x + 6;
   const px2 = player.x + player.w - 6;
   for (const o of obstacles) {
+    if (o.kicked) continue;
     if (o.type === 'beer') {
       // ビールが体の後ろ側まで来たのに蹴っていない → アウト
       if (o.x < player.x + TRIP_OFFSET) {
@@ -333,14 +347,14 @@ function updateEffects(dt) {
   const scroll = state === 'playing' ? speed * dt : 0;
   for (const f of flying) {
     f.x += f.vx * dt - scroll;
-    f.vy -= GRAVITY * 0.6 * dt;
+    f.vy -= EFFECT_GRAVITY * 0.6 * dt;
     f.y += f.vy * dt;
     f.rot += f.vr * dt;
   }
   flying = flying.filter((f) => f.y > -100 && f.x < W + 100);
   for (const p of particles) {
     p.x += p.vx * dt - scroll;
-    p.vy -= GRAVITY * 0.5 * dt;
+    p.vy -= EFFECT_GRAVITY * 0.5 * dt;
     p.y += p.vy * dt;
     p.life -= dt;
   }
@@ -554,10 +568,47 @@ function drawCola(x, y, w, h) {
   ctx.fillRect(x + w / 2 - 4, top - 3, 8, 4);
 }
 
+// ペットボトルのコーラ（大サボテン相当）
+function drawBigCola(x, y, w, h) {
+  const top = y - h;
+  // キャップ
+  ctx.fillStyle = COLOR.colaLabel;
+  ctx.fillRect(x + w / 2 - 4, top, 8, 5);
+  // 首（透明な部分）
+  ctx.fillStyle = '#d9d0c7';
+  ctx.fillRect(x + w / 2 - 4, top + 5, 8, 5);
+  // 肩〜胴
+  ctx.fillStyle = COLOR.cola;
+  ctx.beginPath();
+  ctx.moveTo(x + w / 2 - 4, top + 10);
+  ctx.lineTo(x + 1, top + 20);
+  ctx.lineTo(x + 1, y - 3);
+  ctx.lineTo(x + 3, y);
+  ctx.lineTo(x + w - 3, y);
+  ctx.lineTo(x + w - 1, y - 3);
+  ctx.lineTo(x + w - 1, top + 20);
+  ctx.lineTo(x + w / 2 + 4, top + 10);
+  ctx.closePath();
+  ctx.fill();
+  // ラベル
+  ctx.fillStyle = COLOR.colaLabel;
+  ctx.fillRect(x + 1, top + 28, w - 2, 13);
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(x + 4, top + 33, w - 8, 2);
+  // 反射
+  ctx.fillStyle = 'rgba(255,255,255,0.25)';
+  ctx.fillRect(x + 4, top + 44, 2, h - 50);
+}
+
 function drawObstacles() {
   for (const o of obstacles) {
-    if (o.type === 'beer') drawBeer(o.x, GROUND_Y, o.w, o.h);
-    else drawCola(o.x, GROUND_Y, o.w, o.h);
+    if (o.kicked) continue;
+    for (let i = 0; i < o.size; i++) {
+      const x = o.x + i * o.unitW;
+      if (o.type === 'beer') drawBeer(x, GROUND_Y, o.unitW, o.h);
+      else if (o.type === 'cola') drawCola(x, GROUND_Y, o.unitW, o.h);
+      else drawBigCola(x, GROUND_Y, o.unitW, o.h);
+    }
   }
   for (const f of flying) {
     ctx.save();
@@ -633,7 +684,7 @@ function autoPlay() {
   if (!o) return;
   const t = timeToReach(o);
   if (o.type === 'beer' && t <= KICK_WINDOW * 0.5) press();
-  if (o.type === 'cola' && t <= KICK_WINDOW + 0.05 && t > KICK_WINDOW) press();
+  if (o.type !== 'beer' && t <= KICK_WINDOW + 0.12 && t > KICK_WINDOW) press();
 }
 
 // ===== ループ =====
