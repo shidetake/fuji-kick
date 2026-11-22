@@ -371,89 +371,90 @@ function drawGround() {
 const PIXEL = 2; // 1ドットの大きさ(px)
 const PALETTE = {
   H: '#1c1c1c', // 髪
-  h: '#3a3a3a', // 髪のツヤ
-  S: '#f2cfae', // 肌
-  M: '#c9826b', // 口
-  G: '#0a0a0a', // メガネの縁
-  L: '#5a5f6a', // レンズ（色付き）
-  l: '#9aa0ab', // レンズの反射
-  K: '#2b2b2b', // パーカー
-  k: '#1a1a1a', // パーカーの影（腕のライン）
-  w: '#e8e8e8', // 胸のロゴ
+  h: '#454545', // 髪のツヤ（パーマのうねり）
+  S: '#eec4a0', // 肌
+  s: '#d9a682', // 肌の影
+  E: '#2a1a12', // 目（笑って細くなってる）
+  M: '#8a3b2e', // 口
+  T: '#ffffff', // 歯
+  K: '#262626', // 黒トップス
+  k: '#121212', // 影（腕のライン）
   P: '#363a42', // ワイドパンツ
   W: '#c9c4bb', // スニーカー
   O: '#8c867c', // ソール
 };
 
 const BODY = [
-  '......HHHHHH',
-  '....HHHHhhHHHH',
-  '...HHHHhhHHHHHH',
-  '..HHHHHHHHHHHHHH',
-  '..HHHHHHHHHHHHHHH',
-  '.HHHHHHHHHHHHHHHH',
-  '.HHHHHHHHHHHHHHHHH',
-  '.HHHHHHHHHSHHSHHHH',
-  '.HHHHHHHSGGGGGGGGH',
-  '.HHHHHHSSGLlLGLlLG',
-  '..HHHHHSSGGGGGGGGG',
-  '..HHHHSSSSSSSSSSSS',
-  '...HHHSSSSSSSMMSS',
-  '..KKK.SSSSSSSSSS',
-  '..KKKKKSSSSSSS',
-  '..KKKKKKKKKKKKKK',
-  '.KKKKKKKKKKKKKKKK',
-  '.KKKKkKKKKKKwKKKK',
-  '.KKKKkKKKKKKKKKKK',
-  '.KKKKkKKKKKKKKKKK',
-  '.KKKKkKKKKKKKKKKK',
-  '.KKKKSSKKKKKKKKKK',
-  '..KKKKKKKKKKKKKK',
+  '.....HHHHHH',
+  '...HHHHHHHHHH',
+  '..HHHHHHhhHHHH',
+  '.HHHhhHHHHHHHHH',
+  '.HHHHHHHHHhhHHHH',
+  'HHHHHHHHHHHHHHHH',
+  'HHhhHHHHHHHHHHHH',
+  'HHHHHHHHhhHHHHHH',
+  'HHHHHHHSHHSSSHHS',
+  '.HHHHHSSSSSSSSSS',
+  'HHHHHsSSSEESSEES',
+  '.HHHSsSSSSSSSSSS',
+  '.HHHSSSSSMTTTMS',
+  '..HHHsSSSSMMMS',
+  '....sSSSSSSS',
+  '.....sSSSS',
+  '....KKKKKKK',
+  '...KKKKKKKKK',
+  '...KKkKKKKKK',
+  '...KKkKKKKKK',
+  '...KKkKKKKKK',
+  '...KKkKKKKKK',
+  '...KKkKKKKKK',
+  '...KKSSKKKKK',
+  '...KKKKKKKKK',
 ];
 
 const LEGS = {
   run1: [
-    '..PPPPPPPPPPPPP',
-    '..PPPPPPPPPPPPP',
-    '..PPPPPP.PPPPPP',
-    '.PPPPPP...PPPPPP',
-    '.PPPPP.....PPPPP',
-    'PPPPP.......PPPPP',
-    'PPPPP........PPPPP',
-    'WWWWW........WWWWWW',
-    'OOOOO........OOOOOO',
+    '...PPPPPPPPP',
+    '...PPPPPPPPP',
+    '..PPPP.PPPPP',
+    '..PPP...PPPP',
+    '.PPPP....PPPP',
+    '.PPP......PPPP',
+    'PPPP.......PPPP',
+    'WWWW.......WWWWW',
+    'OOOO.......OOOOO',
   ],
   run2: [
-    '..PPPPPPPPPPPPP',
-    '..PPPPPPPPPPPPP',
-    '...PPPPPPPPPPP',
-    '...PPPPPPPPPPP',
-    '....PPPPPPPPP',
-    '....PPPPPPPPP',
-    '....PPPPPPPPP',
-    '....WWWWWWWWWW',
-    '....OOOOOOOOOO',
+    '...PPPPPPPPP',
+    '...PPPPPPPPP',
+    '...PPPPPPPP',
+    '....PPPPPPP',
+    '....PPPPPP',
+    '....PPPPPP',
+    '....PPPPPP',
+    '....WWWWWWW',
+    '....OOOOOOO',
   ],
   jump: [
-    '..PPPPPPPPPPPPP',
-    '.PPPPPPPPPPPPPPP',
-    'PPPPPPPPPPPPPPPPP',
-    'PPPPP.....PPPPPP',
-    'PPPPP......PPPPP',
-    'WWWWW......PPPPP',
-    'OOOOO......WWWWWW',
-    '...........OOOOOO',
+    '...PPPPPPPPP',
+    '..PPPPPPPPPPP',
+    '.PPPPPPPPPPPPP',
+    'PPPP.....PPPPP',
+    'PPPP......PPPP',
+    'WWWW......PPPP',
+    'OOOO......WWWWW',
+    '..........OOOOO',
   ],
   kick: [
-    '..PPPPPPPPPPPPPPPPPPWWW',
-    '..PPPPPPPPPPPPPPPPPPWWWO',
-    '...PPPPPPP.........WWWWO',
-    '...PPPPPP',
-    '...PPPPPP',
-    '...PPPPPP',
-    '...PPPPPP',
-    '..WWWWWWWW',
-    '..OOOOOOOO',
+    '...PPPPPPPPPPPPPPPWWW',
+    '...PPPPPPPPPPPPPPPWWWO',
+    '...PPPPP.........WWWWO',
+    '...PPPP',
+    '...PPPP',
+    '...PPPP',
+    '...PPPP',
+    '..WWWWWW',
+    '..OOOOOO',
   ],
 };
 
