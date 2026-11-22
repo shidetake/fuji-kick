@@ -366,60 +366,124 @@ function drawGround() {
   }
 }
 
+// ===== 藤くんのドット絵 =====
+// 1文字 = 1ドット。'.' は透明。右向き。
+const PIXEL = 2; // 1ドットの大きさ(px)
+const PALETTE = {
+  H: '#1c1c1c', // 髪
+  h: '#3a3a3a', // 髪のツヤ
+  S: '#f2cfae', // 肌
+  M: '#c9826b', // 口
+  G: '#0a0a0a', // メガネの縁
+  L: '#5a5f6a', // レンズ（色付き）
+  l: '#9aa0ab', // レンズの反射
+  K: '#2b2b2b', // パーカー
+  k: '#1a1a1a', // パーカーの影（腕のライン）
+  w: '#e8e8e8', // 胸のロゴ
+  P: '#363a42', // ワイドパンツ
+  W: '#c9c4bb', // スニーカー
+  O: '#8c867c', // ソール
+};
+
+const BODY = [
+  '......HHHHHH',
+  '....HHHHhhHHHH',
+  '...HHHHhhHHHHHH',
+  '..HHHHHHHHHHHHHH',
+  '..HHHHHHHHHHHHHHH',
+  '.HHHHHHHHHHHHHHHH',
+  '.HHHHHHHHHHHHHHHHH',
+  '.HHHHHHHHHSHHSHHHH',
+  '.HHHHHHHSGGGGGGGGH',
+  '.HHHHHHSSGLlLGLlLG',
+  '..HHHHHSSGGGGGGGGG',
+  '..HHHHSSSSSSSSSSSS',
+  '...HHHSSSSSSSMMSS',
+  '..KKK.SSSSSSSSSS',
+  '..KKKKKSSSSSSS',
+  '..KKKKKKKKKKKKKK',
+  '.KKKKKKKKKKKKKKKK',
+  '.KKKKkKKKKKKwKKKK',
+  '.KKKKkKKKKKKKKKKK',
+  '.KKKKkKKKKKKKKKKK',
+  '.KKKKkKKKKKKKKKKK',
+  '.KKKKSSKKKKKKKKKK',
+  '..KKKKKKKKKKKKKK',
+];
+
+const LEGS = {
+  run1: [
+    '..PPPPPPPPPPPPP',
+    '..PPPPPPPPPPPPP',
+    '..PPPPPP.PPPPPP',
+    '.PPPPPP...PPPPPP',
+    '.PPPPP.....PPPPP',
+    'PPPPP.......PPPPP',
+    'PPPPP........PPPPP',
+    'WWWWW........WWWWWW',
+    'OOOOO........OOOOOO',
+  ],
+  run2: [
+    '..PPPPPPPPPPPPP',
+    '..PPPPPPPPPPPPP',
+    '...PPPPPPPPPPP',
+    '...PPPPPPPPPPP',
+    '....PPPPPPPPP',
+    '....PPPPPPPPP',
+    '....PPPPPPPPP',
+    '....WWWWWWWWWW',
+    '....OOOOOOOOOO',
+  ],
+  jump: [
+    '..PPPPPPPPPPPPP',
+    '.PPPPPPPPPPPPPPP',
+    'PPPPPPPPPPPPPPPPP',
+    'PPPPP.....PPPPPP',
+    'PPPPP......PPPPP',
+    'WWWWW......PPPPP',
+    'OOOOO......WWWWWW',
+    '...........OOOOOO',
+  ],
+  kick: [
+    '..PPPPPPPPPPPPPPPPPPWWW',
+    '..PPPPPPPPPPPPPPPPPPWWWO',
+    '...PPPPPPP.........WWWWO',
+    '...PPPPPP',
+    '...PPPPPP',
+    '...PPPPPP',
+    '...PPPPPP',
+    '..WWWWWWWW',
+    '..OOOOOOOO',
+  ],
+};
+
+const SPRITE_ROWS = BODY.length + 9; // 足元までの行数（走り・キック基準）
+
+function drawPixels(c, rows, x, y) {
+  rows.forEach((row, r) => {
+    for (let i = 0; i < row.length; i++) {
+      const color = PALETTE[row[i]];
+      if (!color) continue;
+      c.fillStyle = color;
+      c.fillRect(x + i * PIXEL, y + r * PIXEL, PIXEL, PIXEL);
+    }
+  });
+}
+
+function drawFuji(c, x, baseY, pose, bob = 0) {
+  // 足元（最終行の下）が baseY に来るように配置。ジャンプは脚を畳むので少し上がる
+  const top = baseY - SPRITE_ROWS * PIXEL;
+  drawPixels(c, LEGS[pose], x, top + BODY.length * PIXEL);
+  drawPixels(c, BODY, x, top + bob); // 走りの上下動は上半身だけ（沈み込む）
+}
+
 function drawPlayer() {
-  const x = player.x;
-  const baseY = sy(player.y);
-  const kicking = player.kickTimer > 0;
-  ctx.strokeStyle = COLOR.ink;
-  ctx.fillStyle = COLOR.ink;
-  ctx.lineWidth = 5;
-  ctx.lineCap = 'round';
-
-  const hipX = x + 15;
-  const hipY = baseY - 22;
-  const neckY = baseY - 42;
-
-  // 頭
-  ctx.beginPath();
-  ctx.arc(hipX + 2, baseY - 50, 8, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 胴体
-  ctx.beginPath();
-  ctx.moveTo(hipX, hipY);
-  ctx.lineTo(hipX + 2, neckY);
-  ctx.stroke();
-
-  // 腕
-  const swing = Math.sin(player.runPhase) * 7;
-  ctx.beginPath();
-  ctx.moveTo(hipX + 1, neckY + 5);
-  ctx.lineTo(hipX + 9 + swing, neckY + 15);
-  ctx.moveTo(hipX + 1, neckY + 5);
-  ctx.lineTo(hipX - 7 - swing, neckY + 15);
-  ctx.stroke();
-
-  // 脚
-  ctx.beginPath();
-  if (kicking) {
-    // 前に蹴り出す
-    ctx.moveTo(hipX, hipY);
-    ctx.lineTo(hipX + 26, hipY + 10);
-    ctx.moveTo(hipX, hipY);
-    ctx.lineTo(hipX - 4, baseY);
-  } else if (!player.onGround) {
-    ctx.moveTo(hipX, hipY);
-    ctx.lineTo(hipX + 10, hipY + 14);
-    ctx.moveTo(hipX, hipY);
-    ctx.lineTo(hipX - 8, hipY + 16);
-  } else {
-    const s = Math.sin(player.runPhase) * 9;
-    ctx.moveTo(hipX, hipY);
-    ctx.lineTo(hipX + s, baseY);
-    ctx.moveTo(hipX, hipY);
-    ctx.lineTo(hipX - s, baseY);
-  }
-  ctx.stroke();
+  let pose;
+  if (player.kickTimer > 0) pose = 'kick';
+  else if (!player.onGround) pose = 'jump';
+  else pose = Math.floor(player.runPhase / 2) % 2 === 0 ? 'run1' : 'run2';
+  const bob = pose === 'run2' ? PIXEL : 0;
+  drawFuji(ctx, player.x - 1, Math.round(sy(player.y)), pose, bob);
 }
 
 function drawBeer(x, y, w, h) {
