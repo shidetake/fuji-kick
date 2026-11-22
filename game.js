@@ -86,13 +86,13 @@ function startSpeed() {
 resize();
 window.addEventListener('resize', resize);
 
-// ===== キャラの選択（前回のキャラを覚えておく） =====
-function loadCharacter() {
-  try { return localStorage.getItem('fuji-kick-character') === 'mio' ? 'mio' : 'fuji'; } catch { return 'fuji'; }
+// ===== キャラは遊ぶたびに藤くん→みおちゃん→…と交代する（次の番をブラウザに覚えておく） =====
+const otherCharacter = (id) => (id === 'mio' ? 'fuji' : 'mio');
+function loadNextCharacter() {
+  try { return localStorage.getItem('fuji-kick-next') === 'mio' ? 'mio' : 'fuji'; } catch { return 'fuji'; }
 }
-function setCharacter(id) {
-  characterId = id === 'mio' ? 'mio' : 'fuji';
-  try { localStorage.setItem('fuji-kick-character', characterId); } catch { /* 無視 */ }
+function saveNextCharacter(id) {
+  try { localStorage.setItem('fuji-kick-next', id); } catch { /* 無視 */ }
 }
 
 // ===== ハイスコア =====
@@ -117,7 +117,7 @@ const player = {
 };
 
 let state = 'title';   // title | playing | over
-let characterId = loadCharacter(); // fuji | mio
+let characterId = loadNextCharacter(); // 今（タイトルでは次に）走るキャラ。fuji | mio
 let speed = START_SPEED;
 let distance = 0;
 let kicks = 0;
@@ -222,21 +222,13 @@ function gameOver(message) {
 }
 
 // ===== 入力（1ボタン） =====
-// ゲーム開始（id を渡すとそのキャラに切り替えてから始める）
-function startGame(id) {
-  if (id) setCharacter(id);
-  window.FujiSelect?.hide();
+// ゲーム開始。リトライのときは前回と別のキャラに交代する
+function startGame() {
+  if (state === 'over') characterId = otherCharacter(characterId);
+  saveNextCharacter(otherCharacter(characterId));
   window.FujiRanking?.hide();
   reset();
   state = 'playing';
-}
-
-// タイトル（キャラ選択）に戻る
-function goTitle() {
-  window.FujiRanking?.hide();
-  reset();
-  state = 'title';
-  window.FujiSelect?.show();
 }
 
 function press() {
@@ -795,16 +787,25 @@ function draw() {
   drawObstacles();
   drawPlayer();
 
+  const ch = currentCharacter();
   if (state === 'title') {
-    if (window.FujiSelect) return; // キャラ選択画面（select.js）が出ている
     drawCenter([
       ['FUJI-KICK', 40, true],
-      ['ビールは引きつけて蹴る / コーラは早めにジャンプ', 16, false],
+      ['藤くんとみおちゃんが交代で走るよ', 16, false],
+      [`次は${ch.name}：${ch.rule}`, 16, true],
       ['タップ or スペースでスタート', 16, false],
     ]);
     ctx.textAlign = 'left';
   } else {
     drawHud();
+    // スタート直後（障害物が出るまで）は誰の番かとルールを出す
+    if (state === 'playing' && runningTime < CLEAR_TIME) {
+      drawCenter([
+        [`${ch.name}の番！`, 28, true],
+        [ch.rule, 18, false],
+      ]);
+      ctx.textAlign = 'left';
+    }
     if (state === 'over') {
       drawCenter([
         ['GAME OVER', 36, true],
