@@ -537,45 +537,44 @@ const LEGS = {
   ],
 };
 
-// ===== みおちゃんのドット絵（仮。写真をもらったら描き直す） =====
+// ===== みおちゃんのドット絵 =====
+// 暗めの茶色のストレート（肩まで、シースルーの前髪）、黒のノースリーブ、グレーのワイドパンツ、黒スニーカー
 const MIO_PALETTE = {
   ...PALETTE,
-  H: '#5b3a26', // 髪（茶色のロング）
-  h: '#7a5038', // 髪のツヤ
-  K: '#efe7dc', // クリーム色のニット
-  k: '#d6cbbb', // ニットの影
-  P: '#7d93b0', // デニム
-  W: '#ffffff', // 白いスニーカー
-  O: '#c8c8c8', // ソール
+  H: '#2e211b', // 髪
+  h: '#4d3a2f', // 髪のツヤ
+  w: '#ffffff', // 目の光
+  U: '#262626', // 黒のノースリーブ
+  g: '#141414', // ノースリーブの縁
+  P: '#7d8088', // グレーのワイドパンツ
+  W: '#1c1c1c', // 黒スニーカー
+  O: '#5a5a5a', // ソール
 };
 
 const MIO_BODY = [
   '.....HHHHHH',
   '...HHHHHHHHHH',
-  '..HHHHHhhHHHHH',
-  '.HHHHHHHHhhHHHH',
-  '.HHHHHHHHHHHHHHH',
+  '..HHHHHHHHHHHH',
+  '.HHHHhhHHHHHHHH',
+  '.HHHhHHHHHHHHHHH',
   'HHHHHHHHHHHHHHHH',
   'HHHHHHHHHHHHHHHH',
-  'HHHHHHHHHHHHHHHH',
-  'HHHHHHHHSSSHHHHS',
+  'HHHHHHHHSHHSHHSH',
   'HHHHHHSSSSSSSSSS',
-  'HHHHHsSSSEESSEES',
+  'HHHHHsSSSEwSSEwS',
+  'HHHHSsSSSEESSEES',
   'HHHHSsSSSSSSSSSS',
-  'HHHHSSSSSSMMMSS',
-  'HHHHHsSSSSSSSS',
+  'HHHHSSSSSMSSSMS',
+  'HHHHHsSSSSMMMS',
   'HHHHHHsSSSS',
-  'HHHHHKKKKKKKK',
-  'HHHHKKKKKKKKKK',
-  'HHHHKkKKKKKKKK',
-  '.HHKKkKKKKKKKK',
-  '..KKKkKKKKKKK',
-  '..KKKkKKKKKKK',
-  '..KKKkKKKKKKK',
-  '..KKKkKKKKKKK',
-  '..KKKkKKKKKKK',
-  '..KKKSSKKKKKK',
-  '..kkkkkkkkkkk',
+  'HHHHHHgUUUgUU',
+  'HHHHHsSUUUUUUg',
+  '.HHHHsSUUUUUUg',
+  '..gUsSUUUUUUg',
+  '..gUsSUUUUUUg',
+  '..gUsSUUUUUUg',
+  '..gUSSSUUUUUg',
+  '..ggggggggggg',
 ];
 
 const HEM_OVERLAP = 0; // 裾が脚に重なる行数
