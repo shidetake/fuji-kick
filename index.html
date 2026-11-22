@@ -29,10 +29,118 @@
     html, body, canvas {
       -webkit-tap-highlight-color: transparent;
     }
+
+    /* ===== ゲームオーバー画面とランキング ===== */
+    .overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(247, 247, 247, 0.6);
+    }
+    .overlay[hidden], .overlay [hidden] { display: none; }
+    .card {
+      box-sizing: border-box;
+      width: min(360px, calc(100vw - 32px));
+      max-height: calc(100vh - 16px);
+      max-height: calc(100dvh - 16px);
+      overflow-y: auto;
+      touch-action: pan-y;
+      padding: 12px 16px;
+      background: #ffffff;
+      border: 2px solid #535353;
+      border-radius: 8px;
+      text-align: center;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+    .card h1 { margin: 0; font-size: 22px; letter-spacing: 0.05em; }
+    #result-message { margin: 2px 0 0; font-weight: bold; }
+    #result-score { margin: 2px 0 8px; font-family: ui-monospace, Menlo, monospace; font-size: 14px; }
+    .card h2 { margin: 6px 0 4px; font-size: 14px; }
+    #ranking-list { list-style: none; margin: 0; padding: 0; font-size: 14px; }
+    #ranking-list li { display: flex; gap: 8px; padding: 1px 6px; border-radius: 4px; }
+    #ranking-list li.you { background: #f2a81d; color: #ffffff; font-weight: bold; }
+    #ranking-list li.gap { justify-content: center; color: #a0a0a0; }
+    #ranking-list .rank { width: 2.5em; text-align: right; }
+    #ranking-list .name { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #ranking-list .score { font-family: ui-monospace, Menlo, monospace; }
+    #ranking-status { margin: 4px 0; font-size: 13px; color: #888888; }
+    #ranking-status:empty { display: none; }
+    #name-form { margin: 6px 0; }
+    #name-form label { display: block; margin-bottom: 4px; font-size: 14px; }
+    #name-input {
+      box-sizing: border-box;
+      width: 100%;
+      padding: 6px 8px;
+      font-size: 16px; /* iOS で入力時にズームしないよう 16px 以上 */
+      border: 2px solid #535353;
+      border-radius: 6px;
+    }
+    .buttons { display: flex; gap: 8px; justify-content: center; margin-top: 8px; }
+    .buttons button, #name-form button {
+      font: inherit;
+      font-size: 14px;
+      padding: 6px 14px;
+      border: 2px solid #535353;
+      border-radius: 6px;
+      background: #ffffff;
+      color: #535353;
+    }
+    .buttons button.primary, #name-form button.primary { background: #535353; color: #ffffff; }
+    .hint { margin: 6px 0 0; font-size: 12px; color: #a0a0a0; }
+    .card { display: flex; flex-direction: column; }
+    /* スマホ縦持ちなど：ランキングを先に、ボタンを最後に */
+    .card .result { display: contents; }
+    .card #actions { order: 2; }
+    .card .board { order: 1; }
+    /* 横持ちなど画面が低いとき：左に結果とボタン、右にランキングの2列 */
+    @media (max-height: 520px) and (min-width: 560px) {
+      .card { width: min(640px, calc(100vw - 32px)); flex-direction: row; gap: 16px; align-items: center; }
+      .card .result { display: block; flex: 1; }
+      .card .board { flex: 1; }
+      .card h2 { margin-top: 0; }
+    }
   </style>
 </head>
 <body>
   <canvas id="game"></canvas>
+
+  <div id="ranking" class="overlay" hidden>
+    <div class="card ui">
+      <div class="col result">
+      <h1>GAME OVER</h1>
+      <p id="result-message"></p>
+      <p id="result-score"></p>
+
+      <form id="name-form" hidden>
+        <label for="name-input">ランキング用の名前（10文字まで）</label>
+        <input id="name-input" type="text" autocomplete="nickname" enterkeyhint="done">
+        <div class="buttons">
+          <button type="button" id="skip-button">今回は登録しない</button>
+          <button type="submit" class="primary">登録</button>
+        </div>
+      </form>
+
+      <div id="actions">
+        <div class="buttons">
+          <button type="button" id="rename-button">名前を変える</button>
+          <button type="button" id="retry-button" class="primary">もう一回</button>
+        </div>
+        <p class="hint">枠の外をタップ / スペースでもリトライ</p>
+      </div>
+      </div>
+
+      <div class="col board">
+      <h2>ランキング TOP10</h2>
+      <p id="ranking-status"></p>
+      <ol id="ranking-list"></ol>
+      </div>
+    </div>
+  </div>
+
   <script src="game.js"></script>
+  <script src="ranking.js"></script>
 </body>
 </html>

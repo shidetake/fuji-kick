@@ -207,6 +207,8 @@ function gameOver(message) {
     high = score;
     saveHigh(high);
   }
+  // ランキング（ranking.js）にスコアを渡す
+  window.FujiRanking?.onGameOver({ score: Math.floor(score), kicks, duration: runningTime });
 }
 
 // ===== 入力（1ボタン） =====
@@ -218,6 +220,8 @@ function press() {
   }
   if (state === 'over') {
     if (clock - overTime < 0.6) return; // 連打で即リトライしないように
+    if (window.FujiRanking?.blocksRetry()) return; // 名前の入力中など
+    window.FujiRanking?.hide();
     reset();
     state = 'playing';
     return;
@@ -290,8 +294,10 @@ function kick(o) {
 }
 
 const isActionKey = (e) => e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Enter';
+// 名前の入力欄やボタンの操作はゲームの入力として扱わない
+const isUiEvent = (e) => e.target instanceof Element && e.target.closest('.ui');
 window.addEventListener('keydown', (e) => {
-  if (!isActionKey(e)) return;
+  if (!isActionKey(e) || isUiEvent(e)) return;
   e.preventDefault();
   if (!e.repeat) press();
 });
@@ -300,6 +306,7 @@ window.addEventListener('keyup', (e) => {
 });
 // 本家と同じく画面のどこをタップしても反応する
 window.addEventListener('pointerdown', (e) => {
+  if (isUiEvent(e)) return;
   e.preventDefault();
   press();
 });
