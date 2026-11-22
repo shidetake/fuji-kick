@@ -408,7 +408,8 @@ const PALETTE = {
   T: '#ffffff', // 歯
   K: '#262626', // 黒パーカー
   k: '#141414', // パーカーの影（腕・ポケット・裾のリブ）
-  D: '#cfcfcf', // パーカーの紐
+  F: '#3d3d3d', // フード（髪や服と区別できるよう少し明るく）
+  f: '#0e0e0e', // フードの内側の影
   P: '#363a42', // ワイドパンツ
   W: '#c9c4bb', // スニーカー
   O: '#8c867c', // ソール
@@ -428,13 +429,13 @@ const BODY = [
   'HHHHHsSSSEESSEES',
   '.HHHSsSSSSSSSSSS',
   '.HHHSSSSSMTTTMS',
-  '..HHHsSSSSMMMS',
-  '..kKKsSSSSSSS',
-  '.kKKKKsSSSS',
-  '.kKKKKKKDKDKK',
-  '..KKKKKKDKDKK',
-  '..KKKkKKDKDKK',
-  '..KKKkKKKKKKK',
+  '.FHHHsSSSSMMMS',
+  'FKKKfsSSSSSSS',
+  'FKKKKfsSSSS',
+  'FKKKKKfKKKKKK',
+  'FKKKKKKfKKKKK',
+  '.fKKKkKKKKKKK',
+  '..ffKkKKKKKKK',
   '..KKKkKKKKKKK',
   '..KKKkKkkkkkK',
   '..KKKkKKKKKKK',
