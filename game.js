@@ -6,8 +6,10 @@ const H = 260;              // 論理解像度（縦）
 const GROUND_Y = 220;       // 地面の高さ
 const GRAVITY = 2400;       // px/s^2
 const JUMP_VELOCITY = 720;  // px/s
-const KICK_WINDOW = 0.25;   // 障害物到達まで何秒以内に押したらキックになるか
-const KICK_DURATION = 0.22; // キックポーズの長さ（秒）
+const KICK_WINDOW = 0.10;   // 障害物到達まで何秒以内に押したらキックになるか
+const TRIP_OFFSET = 4;      // ビールがプレイヤー左端からこの位置(px)まで来たらつまづく
+const KICK_DURATION = 0.18; // キックポーズの長さ（秒）
+const KICK_LOCK = 0.08;     // キック直後、次の入力を受け付けない時間（秒）
 const START_SPEED = 360;    // px/s
 const MAX_SPEED = 900;
 const ACCEL = 9;            // 1秒ごとの加速量
@@ -86,19 +88,104 @@ function reset() {
   flying = [];
   particles = [];
   spawnTimer = 1.0;
+  queue = [];
+  planned = { last: null, streak: 0 };
 }
 
-function spawn() {
-  const isBeer = Math.random() < BEER_RATIO;
-  if (isBeer) {
+// ===== 障害物の出し方 =====
+// 出す予定の障害物を { type, gap } のキューで持つ。gap は「1つ前の障害物から何秒後に来るか」。
+
+// 直前→次 の組み合わせごとの最短間隔（秒）。これより詰めると人間には無理になる。
+const MIN_GAP = {
+  beer: { beer: 0.35, cola: 0.55 }, // キックは一瞬なので詰められる
+  cola: { beer: 0.70, cola: 0.85 }, // ジャンプは着地を待つ必要がある
+};
+const MAX_STREAK = { beer: 5, cola: 3 }; // 同じ種類はこれ以上続けない
+
+// ときどき出す決まった並び
+const PATTERNS = [
+  { name: '連続キック', types: ['beer', 'beer', 'beer'], weight: 3 },
+  { name: '着地して蹴る', types: ['cola', 'beer'], weight: 2 },
+  { name: '蹴って跳ぶ', types: ['beer', 'cola'], weight: 2 },
+  { name: '連続ジャンプ', types: ['cola', 'cola'], weight: 1 },
+];
+
+let queue = [];
+let planned = { last: null, streak: 0 }; // キューに積んだ最後の種類と、その連続数
+
+const lerp = (a, b, t) => a + (b - a) * t;
+const rand = (a, b) => a + Math.random() * (b - a);
+const progress = () => (speed - START_SPEED) / (MAX_SPEED - START_SPEED); // 0〜1
+
+// 普段の間隔：たまに詰まる / だいたい普通 / たまに休める
+function sampleGap(prev, next) {
+  const min = prev ? MIN_GAP[prev][next] : 0;
+  const p = progress();
+  const r = Math.random();
+  let gap;
+  if (r < 0.15) {
+    gap = min + rand(0, 0.1);                          // 詰まった間隔
+  } else if (r < 0.87) {
+    gap = rand(lerp(0.9, 0.7, p), lerp(1.7, 1.1, p));  // 普通
+  } else {
+    gap = rand(lerp(1.9, 1.4, p), lerp(2.7, 2.0, p));  // 休み
+  }
+  return Math.max(min, gap);
+}
+
+function wouldExceedStreak(types) {
+  let { last, streak } = planned;
+  for (const t of types) {
+    streak = t === last ? streak + 1 : 1;
+    last = t;
+    if (streak > MAX_STREAK[t]) return true;
+  }
+  return false;
+}
+
+function enqueue(type, gap) {
+  planned.streak = type === planned.last ? planned.streak + 1 : 1;
+  planned.last = type;
+  queue.push({ type, gap });
+}
+
+function fillQueue() {
+  const patternProb = lerp(0.15, 0.35, progress());
+  if (Math.random() < patternProb) {
+    const candidates = PATTERNS.filter((pt) => !wouldExceedStreak(pt.types));
+    const total = candidates.reduce((s, pt) => s + pt.weight, 0);
+    let r = Math.random() * total;
+    const pattern = candidates.find((pt) => (r -= pt.weight) < 0);
+    if (pattern) {
+      pattern.types.forEach((type, i) => {
+        const prev = planned.last;
+        // 1つ目は普段の間隔、2つ目以降は最短間隔ギリギリで詰める
+        const gap = i === 0 ? sampleGap(prev, type) : MIN_GAP[prev][type] + rand(0, 0.08);
+        enqueue(type, gap);
+      });
+      return;
+    }
+  }
+  // 単発
+  let type = Math.random() < BEER_RATIO ? 'beer' : 'cola';
+  if (wouldExceedStreak([type])) type = type === 'beer' ? 'cola' : 'beer';
+  enqueue(type, sampleGap(planned.last, type));
+}
+
+function peekNext() {
+  if (!queue.length) fillQueue();
+  return queue[0];
+}
+
+function spawnNext() {
+  const { type } = peekNext();
+  queue.shift();
+  if (type === 'beer') {
     obstacles.push({ type: 'beer', x: W + 20, w: 26, h: 36 });
   } else {
     obstacles.push({ type: 'cola', x: W + 20, w: 18, h: 48 });
   }
-  // 次の出現までの時間（ジャンプの滞空時間より短くならないように）
-  const min = 0.75;
-  const max = Math.max(1.0, 1.9 - (speed - START_SPEED) / 600);
-  spawnTimer = min + Math.random() * (max - min);
+  spawnTimer += peekNext().gap;
 }
 
 // 自分の前にある、まだ処理されていない一番近い障害物
@@ -138,7 +225,7 @@ function press() {
     state = 'playing';
     return;
   }
-  if (!player.onGround || player.kickTimer > 0) return;
+  if (!player.onGround || player.kickTimer > KICK_DURATION - KICK_LOCK) return;
 
   const target = nearestAhead();
   if (target && timeToReach(target) <= KICK_WINDOW) {
@@ -212,7 +299,7 @@ function update(dt) {
 
   // 障害物
   spawnTimer -= dt;
-  if (spawnTimer <= 0) spawn();
+  while (spawnTimer <= 0) spawnNext();
   for (const o of obstacles) o.x -= dx;
   obstacles = obstacles.filter((o) => o.x + o.w > -50);
 
@@ -221,8 +308,8 @@ function update(dt) {
   const px2 = player.x + player.w - 6;
   for (const o of obstacles) {
     if (o.type === 'beer') {
-      // ビールが体の真ん中まで来たのに蹴っていない → アウト
-      if (o.x < player.x + player.w * 0.5) {
+      // ビールが体の後ろ側まで来たのに蹴っていない → アウト
+      if (o.x < player.x + TRIP_OFFSET) {
         if (player.onGround) {
           gameOver('ビールにつまづいた！');
         } else {
