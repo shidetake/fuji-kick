@@ -6,7 +6,7 @@ const H = 260;              // 論理解像度（縦）
 const GROUND_Y = 220;       // 地面の高さ
 const GRAVITY = 2400;       // px/s^2
 const JUMP_VELOCITY = 720;  // px/s
-const KICK_WINDOW = 0.10;   // 障害物到達まで何秒以内に押したらキックになるか
+const KICK_WINDOW = 0.06;   // 障害物到達まで何秒以内に押したらキックになるか
 const TRIP_OFFSET = 4;      // ビールがプレイヤー左端からこの位置(px)まで来たらつまづく
 const KICK_DURATION = 0.18; // キックポーズの長さ（秒）
 const KICK_LOCK = 0.08;     // キック直後、次の入力を受け付けない時間（秒）
@@ -25,7 +25,6 @@ const COLOR = {
   foam: '#ffffff',
   cola: '#3b1f14',
   colaLabel: '#d62828',
-  hint: 'rgba(242, 168, 29, 0.35)',
 };
 
 // ===== キャンバス =====
@@ -402,18 +401,15 @@ const BODY = [
   '..HHHsSSSSMMMS',
   '..kKKsSSSSSSS',
   '.kKKKKsSSSS',
-  '.kKKKKKKDKDKKK',
-  '.KKKKKKKDKDKKKK',
-  '.KKKKkKKDKDKKKK',
-  '.KKKKkKKKKKKKKK',
-  '.KKKKkKKKKKKKKK',
-  '.KKKKkKKKKKKKKK',
-  '.KKKKkKKkkkkkKK',
-  '.KKKKkKKKKKKKKK',
-  '.KKKkkkKKKKKKKK',
-  '.KKKSSKKKKKKKKK',
-  '.KKKKKKKKKKKKKK',
-  '.kkkkkkkkkkkkkk',
+  '.kKKKKKKDKDKK',
+  '..KKKKKKDKDKK',
+  '..KKKkKKDKDKK',
+  '..KKKkKKKKKKK',
+  '..KKKkKKKKKKK',
+  '..KKKkKkkkkkK',
+  '..KKKkKKKKKKK',
+  '..KKKSSKKKKKK',
+  '..kkkkkkkkkkk',
 ];
 
 const LEGS = {
@@ -460,11 +456,11 @@ const LEGS = {
   ],
   kick: [
     '...PPPPPPPPP',
-    '...PPPPPPPPP',
-    '...PPPPPPPPP',
-    '...PPPPPPPPPPPPPPPPWWW',
-    '...PPPPPPPPPPPPPPPPWWWO',
-    '...PPPPP..........WWWWO',
+    '...PPPPPPPPPPPPPPPPPWWW',
+    '...PPPPPPPPPPPPPPPPPWWWO',
+    '...PPPPP...........WWWWO',
+    '...PPPP',
+    '...PPPP',
     '...PPPP',
     '...PPPP',
     '...PPPP',
@@ -474,7 +470,7 @@ const LEGS = {
   ],
 };
 
-const HEM_OVERLAP = 3; // だぼっとした裾が脚に重なる行数
+const HEM_OVERLAP = 0; // 裾が脚に重なる行数
 const SPRITE_ROWS = BODY.length - HEM_OVERLAP + 12; // 足元までの行数（走り・キック基準）
 
 function drawPixels(c, rows, x, y) {
@@ -559,15 +555,7 @@ function drawCola(x, y, w, h) {
 }
 
 function drawObstacles() {
-  const target = state === 'playing' ? nearestAhead() : null;
   for (const o of obstacles) {
-    // キックできる距離に入ったビールの足元を光らせる
-    if (o === target && o.type === 'beer' && timeToReach(o) <= KICK_WINDOW) {
-      ctx.fillStyle = COLOR.hint;
-      ctx.beginPath();
-      ctx.ellipse(o.x + o.w / 2, GROUND_Y, o.w, 7, 0, 0, Math.PI * 2);
-      ctx.fill();
-    }
     if (o.type === 'beer') drawBeer(o.x, GROUND_Y, o.w, o.h);
     else drawCola(o.x, GROUND_Y, o.w, o.h);
   }
